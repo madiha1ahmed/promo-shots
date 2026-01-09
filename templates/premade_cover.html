@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Send Pre-Made Cover Letter</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+  <div class="container mt-5">
+    <h2 class="text-center">📩 Send Your Pre-Made Cover Letter</h2>
+    <p class="text-center text-muted">Upload your Excel list of companies, an optional resume, and your pre-written cover letter.</p>
+
+    <form id="premadeForm" method="POST" action="{{ url_for('send_premade_cover') }}" enctype="multipart/form-data">
+      <div class="mb-3">
+          <label class="form-label">Upload Excel/CSV File</label>
+          <input type="file" class="form-control" name="email_file" required>
+      </div>
+  
+      <!-- Multiple optional attachments (resume, brochures, etc.) -->
+      <div class="mb-3">
+        <label for="attachments">Upload Attachments (Optional)</label>
+        <input type="file" name="attachments" id="attachments" multiple />
+        <div id="attachment-preview"></div>
+        
+          <small class="form-text text-muted">Upload any files (PDF, DOCX, etc.)</small>
+      </div>
+  
+      <!-- Upload flyer image -->
+      <div class="mb-3">
+          <label class="form-label">Upload Flyer Image</label>
+          <input type="file" class="form-control" name="flyer_image" accept="image/*" required>
+      </div>
+  
+      <button type="submit" class="btn btn-primary">Send Emails</button>
+  </form>
+  
+  
+
+    <!-- Progress Bar -->
+    <div class="progress mt-4" style="height: 30px;">
+      <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+        style="width: 0%; height: 100%; font-size: 16px;">0%</div>
+    </div>
+  </div>
+
+
+
+
+  <script>
+    const attachmentsInput = document.getElementById('attachments');
+    const previewContainer = document.getElementById('attachment-preview');
+    let attachmentFiles = [];
+    
+    attachmentsInput.addEventListener('change', (e) => {
+        // Merge new files without resetting old ones
+        attachmentFiles = [...attachmentFiles, ...Array.from(e.target.files)];
+        renderFileList();
+    });
+    
+    function renderFileList() {
+        previewContainer.innerHTML = '';
+    
+        attachmentFiles.forEach((file, index) => {
+            const fileDiv = document.createElement('div');
+            fileDiv.style.marginBottom = '5px';
+            fileDiv.innerHTML = `
+                📄 ${file.name} 
+                <button type="button" onclick="removeFile(${index})" style="margin-left:10px;color:red;">❌ Remove</button>
+            `;
+            previewContainer.appendChild(fileDiv);
+        });
+    }
+    
+    function removeFile(index) {
+        attachmentFiles.splice(index, 1);
+        renderFileList();
+    }
+    
+    // ✅ Ensure final FormData uses `attachmentFiles`
+    document.getElementById('premadeForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        document.querySelector("button[type='submit']").disabled = true;
+
+        const formData = new FormData(this);
+    
+        // Remove default file input files & replace with selected ones
+        formData.delete('attachments');
+    
+        attachmentFiles.forEach(file => {
+            formData.append('attachments', file);
+        });
+    
+        fetch('/send_premade_cover', {
+            method: 'POST',
+            body: formData
+        })
+        .then(async response => {
+            if (response.redirected) {
+                window.location.href = response.url;
+                return;
+            }
+    
+            const data = await response.json();
+            if (data.success && data.redirect_url) {
+                window.location.href = data.redirect_url;
+            } else {
+                alert("❌ " + (data.message || "Something went wrong"));
+            }
+        })
+        .catch(error => {
+            alert("❌ Submission failed. Try again.");
+            console.error("Fetch error:", error);
+        });
+    });
+    </script>
+    
+  
+</body>
+</html>

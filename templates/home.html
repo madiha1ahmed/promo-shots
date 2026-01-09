@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Resume-Shots!</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">Resume-Shots</a>
+        </div>
+    </nav>
+
+    <div class="container mt-5 text-center">
+        <!-- Logo -->
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="CogniLabs Logo" class="img-fluid mb-4" style="max-width: 300px;">
+        
+        <h1 class="mb-4">Automate sending your resume effortlessly!</h1>
+        <p class="lead">
+            Our AI-powered tool helps you generate personalized cover letters and streamline the way you reach out to companies.
+            Simply upload your resume and job listing details, and let our system do the rest!
+        </p>
+        
+        
+        
+        <a href="{{ url_for('upload_files') }}" class="btn btn-primary btn-lg me-3">Get Started 🚀</a>
+        <a href="{{ url_for('premade_cover') }}" class="btn btn-outline-secondary btn-lg">Have your own cover letter? Click here! ✉️</a>
+
+    </div>
+
+    <footer class="text-center mt-5 py-3 bg-light">
+        <p>&copy; 2025 Resume-Shots 📩 | Developed by our interns at CognAIlabs 💻</p>
+    </footer>
+
+</body>
+</html>
