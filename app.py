@@ -10,7 +10,8 @@ from email.mime.base import MIMEBase
 from email import encoders
 import pdfplumber
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate
+from langchain.chains import LLMChain
 
 from langchain.chains import LLMChain
 from datetime import datetime
