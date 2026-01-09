@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: resume-shots
+    env: python
+    buildCommand: ""
+    startCommand: gunicorn -k eventlet -w 1 app:app
+    envVars:
+      - key: OPENAI_API_KEY
+        value: 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
+      - key: OPENROUTER_API_KEY
+        value: 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

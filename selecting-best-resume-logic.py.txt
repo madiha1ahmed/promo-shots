@@ -1,0 +1,48 @@
+def select_best_resume(job_description, resume_texts):
+    """
+    Uses LLM to determine the most relevant resume for the given job description.
+    """
+    best_resume = None
+    best_score = -1
+
+    llm_provider = session.get('llm_provider', 'openai')  # Default to OpenAI
+    llm = initialize_llm(llm_provider)
+
+    for filename, resume_text in resume_texts.items():
+        prompt = f"""
+        You are an **expert hiring assistant** specializing in candidate screening. 
+        Your job is to evaluate a **resume's relevance** to a **specific job description** based on **technical expertise, experience, and role alignment**.
+        
+        **Instructions:**
+        - Give a **higher score (8-10)** if the candidate's resume **closely matches** the job description in terms of **skills, industry, and experience.**
+        - Give a **medium score (5-7)** if the resume has **some relevant experience** but is **not a perfect match.**
+        - Give a **low score (1-4)** if the resume **does not match** the job description at all (e.g., medical doctor for an IT Manager role). 
+
+        **Job Description:**
+        {job_description}
+
+        **Candidate’s Resume:**
+        {resume_text}
+
+        **STRICT RULES:**
+        - **Check if the resume's domain matches the job.** If it's a **different field (e.g., medical for IT), rate it between 1-3.**
+        - **Prioritize industry-specific keywords** (e.g., "IT Manager" should match "IT infrastructure, cybersecurity").
+        - **Do NOT select based on soft skills** (e.g., "strong communicator" is not relevant unless it's a sales role).
+        - **Focus on technical expertise & work history.** 
+        - **Do not** give chances to unmatched profiles **at all**. For example, a receptionist applying for a Data Engineer role - this combination **should not** even be cosidered in the first place. 
+        - **Do not** try to conviince the recruiter that although the necessary skills are not there, I would still want to to try out the Data Engineer role as a recpetionist and I am willing to learn and work hard. 
+        - **Only return a number between 1 and 10.** No extra text.
+        """
+
+        try:
+            score = llm.invoke(prompt).content.strip()
+            score = int(score) if score.isdigit() else 0
+        except Exception as e:
+            print(f"❌ Error scoring resume: {e}")
+            score = 0
+
+        if score > best_score:
+            best_score = score
+            best_resume = filename
+
+    return best_resume  # ✅ Returns the best resume filename
