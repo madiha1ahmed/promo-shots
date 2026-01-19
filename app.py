@@ -35,13 +35,20 @@ import time
 #from urllib.parse import urlparse  # (optional, but fine to keep)
 
 app = Flask(__name__)
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['SESSION_PERMANENT'] = False
-app.config['SESSION_USE_SIGNER'] = True
-app.config['SESSION_KEY_PREFIX'] = 'myapp:'
-#app.config['SESSION_REDIS'] = redis.StrictRedis(host='localhost', port=6379, db=0)
-app.config['SESSION_FILE_DIR'] = './flask_session_files'
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-change-me")
+
+# Force filesystem sessions (no redis)
+app.config["SESSION_TYPE"] = "filesystem"
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_USE_SIGNER"] = True
+app.config["SESSION_KEY_PREFIX"] = "myapp:"
+app.config["SESSION_FILE_DIR"] = "/tmp/flask_session_files"
+
+os.makedirs(app.config["SESSION_FILE_DIR"], exist_ok=True)
+
 Session(app)
+
+
 
 socketio = SocketIO(app, cors_allowed_origins="*")
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -311,7 +318,10 @@ import json
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_files():
     if request.method == 'POST':
-        session.clear()
+        session.pop("email_path", None)
+        session.pop("resume_paths", None)
+        session.pop("emails_data", None)
+
 
         if 'email_file' not in request.files or 'resume_files' not in request.files:
             return jsonify({"error": "Missing files"}), 400
@@ -435,6 +445,10 @@ def select_best_resume(job_description, resume_texts):
         print(f"❌ Resume selection error: {e}")
         return None
 
+
+@app.route("/premade_cover", methods=["GET"])
+def premade_cover():
+    return render_template("premade_cover.html")
 
 
 @app.route('/generate_cover_letters')
