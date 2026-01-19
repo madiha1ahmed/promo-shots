@@ -33,6 +33,11 @@ import base64
 import json
 import time
 #from urllib.parse import urlparse  # (optional, but fine to keep)
+from functools import wraps
+from flask import redirect, url_for
+
+
+
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-change-me")
@@ -64,7 +69,8 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://promo-shots.mesaki.in/oauth2callback/google")
-GOOGLE_SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
+GOOGLE_SCOPES = ["https://www.googleapis.com/auth/gmail.send", "openid", "https://www.googleapis.com/auth/userinfo.email"]
+
 
 def create_google_flow():
     """Create an OAuth Flow object for Google login."""
@@ -80,6 +86,15 @@ def create_google_flow():
         scopes=GOOGLE_SCOPES,
         redirect_uri=GOOGLE_REDIRECT_URI,
     )
+
+def require_google_login(view_func):
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        creds = get_google_creds()
+        if not creds or not creds.valid:
+            return redirect(url_for("home"))
+        return view_func(*args, **kwargs)
+    return wrapper
 
 def get_google_creds():
     data = session.get("google_creds")
@@ -669,9 +684,12 @@ def success():
     return render_template('success.html')
 
 
-@app.route('/')
+@app.route("/")
 def home():
-    return render_template('home.html')
+    creds = get_google_creds()
+    google_connected = creds is not None and creds.valid
+    return render_template("home.html", google_connected=google_connected)
+
 
 @app.route('/view_resume/<filename>')
 def view_resume(filename):
