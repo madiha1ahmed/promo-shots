@@ -35,6 +35,9 @@ import time
 #from urllib.parse import urlparse  # (optional, but fine to keep)
 from functools import wraps
 from flask import redirect, url_for
+import smtplib
+import traceback
+
 
 
 os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
