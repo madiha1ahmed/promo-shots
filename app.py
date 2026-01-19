@@ -3,7 +3,7 @@ import os
 from flask import Flask, session
 from flask_session import Session
 import pandas as pd
-import smtplib
+#import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -12,23 +12,35 @@ import pdfplumber
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
-
-from langchain.chains import LLMChain
 from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 from flask_socketio import SocketIO
 import time
-import redis
-import traceback
+#import redis
+from dotenv import load_dotenv
+load_dotenv()
 #from google import genai
+import os
+from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+import base64
+from google.auth.transport.requests import Request
+import re
+from urllib.parse import urlparse
+import base64
+import json
+import time
+#from urllib.parse import urlparse  # (optional, but fine to keep)
 
 app = Flask(__name__)
-app.config['SESSION_TYPE'] = 'redis'
+app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
 app.config['SESSION_KEY_PREFIX'] = 'myapp:'
-app.config['SESSION_REDIS'] = redis.StrictRedis(host='localhost', port=6379, db=0)
+#app.config['SESSION_REDIS'] = redis.StrictRedis(host='localhost', port=6379, db=0)
+app.config['SESSION_FILE_DIR'] = './flask_session_files'
 Session(app)
 
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -42,6 +54,90 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") 
 #client = genai.Client(api_key="AIzaSyDz3IIqX2E74NaYnXK3CmnKRBOCZekOa8A")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://promo-shots.mesaki.in/oauth2callback/google")
+GOOGLE_SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
+
+def create_google_flow():
+    """Create an OAuth Flow object for Google login."""
+    return Flow.from_client_config(
+        {
+            "web": {
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+            }
+        },
+        scopes=GOOGLE_SCOPES,
+        redirect_uri=GOOGLE_REDIRECT_URI,
+    )
+
+def get_google_creds():
+    data = session.get("google_creds")
+    if not data:
+        return None
+
+    return Credentials(
+        token=data["token"],
+        refresh_token=data.get("refresh_token"),
+        token_uri=data["token_uri"],
+        client_id=data["client_id"],
+        client_secret=data["client_secret"],
+        scopes=data["scopes"],
+    )
+
+
+@app.route("/auth/google")
+def google_auth():
+    """Start Google OAuth login."""
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        return "Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.", 500
+
+    flow = create_google_flow()
+    authorization_url, state = flow.authorization_url(
+        access_type="offline",            # so we get refresh_token
+        include_granted_scopes="true",
+        prompt="consent",                 # ensures refresh_token first time
+    )
+    session["oauth_state"] = state
+    return redirect(authorization_url)
+
+
+@app.route("/oauth2callback/google")
+def google_oauth_callback():
+    flow = create_google_flow()
+
+    # Koyeb terminates HTTPS and calls our app over HTTP,
+    # but oauthlib requires the callback URL to be https.
+    auth_response = request.url
+    if auth_response.startswith("http://"):
+        auth_response = auth_response.replace("http://", "https://", 1)
+
+    # You can temporarily log it if you want to confirm:
+    # print("Auth response URL used for fetch_token:", auth_response)
+
+    flow.fetch_token(authorization_response=auth_response)
+
+    creds = flow.credentials
+
+    session["google_creds"] = {
+        "token": creds.token,
+        "refresh_token": creds.refresh_token,
+        "token_uri": creds.token_uri,
+        "client_id": creds.client_id,
+        "client_secret": creds.client_secret,
+        "scopes": creds.scopes,
+    }
+
+    return redirect(url_for("upload_files"))
+
+@app.route("/logout")
+def logout():
+    """Simple logout: clear session and send back to home."""
+    session.clear()
+    return redirect(url_for("home"))
 
 def initialize_llm(llm_provider):
     if llm_provider == "deepseek":
@@ -429,12 +525,59 @@ def review_emails():
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 
+def send_message_via_gmail_api(creds, to_email, subject, body_text, attachment_path=None, bcc_email=None):
+    """Send a single email with optional attachment using Gmail API."""
+    # Refresh if needed
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        # put refreshed token back into session
+        stored = session.get("google_creds", {})
+        stored["token"] = creds.token
+        session["google_creds"] = stored
+
+    service = build("gmail", "v1", credentials=creds)
+
+    # ⚠️ REMOVE the profile call – no extra scopes needed
+    # profile = service.users().getProfile(userId="me").execute()
+    # sender_email = profile.get("emailAddress")
+
+    msg = MIMEMultipart()
+    # "From" is optional; Gmail will set it to the authenticated user automatically
+    # msg["From"] = sender_email  # <- remove or comment out
+    msg["To"] = to_email
+    if bcc_email:
+        msg["Bcc"] = bcc_email
+    msg["Subject"] = subject
+
+    # Body
+    msg.attach(MIMEText(body_text, "plain"))
+
+    # Attachment (resume)
+    if attachment_path:
+        with open(attachment_path, "rb") as resume_file:
+            attach_file = MIMEBase("application", "octet-stream")
+            attach_file.set_payload(resume_file.read())
+            encoders.encode_base64(attach_file)
+            attach_file.add_header(
+                "Content-Disposition",
+                f'attachment; filename="{os.path.basename(attachment_path)}"',
+            )
+            msg.attach(attach_file)
+
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+    body = {"raw": raw}
+
+    return service.users().messages().send(userId="me", body=body).execute()
+
 @app.route('/send_email', methods=['POST'])
 def send_email():
-    sender_email = "meerahmed@gmail.com"
-    sender_password = "dqqo uhqy tjbz zuok"  # Use a Gmail app password
-    smtp_server = "smtp.gmail.com"
-    smtp_port = 587
+    # 1) Get Google OAuth credentials
+    creds = get_google_creds()
+    if not creds:
+        return jsonify({
+            "success": False,
+            "message": "Google account not connected. Please go back to Home and click 'Connect with Google' first."
+        }), 401
 
     emails_data = session.get('emails_data', [])
     resume_paths = session.get('resume_paths', {})  # ✅ Now using stored resume paths
@@ -484,7 +627,15 @@ def send_email():
                 attach_file.add_header('Content-Disposition', f'attachment; filename={os.path.basename(resume_path)}')
                 msg.attach(attach_file)
 
-            server.send_message(msg)
+            send_message_via_gmail_api(
+                creds=creds,
+                to_email=email["recipient_email"],
+                subject=subject,
+                body_text=body_text,
+                attachment_path=resume_path,
+                bcc_email=None  # or set to a fixed address if you like
+            )
+
             print(f"✅ Email sent to {email['recipient_email']} for {email['job_position']}")
 
         server.quit()
