@@ -331,6 +331,7 @@ def generate_cover_letter(company_name, job_position, job_description, website_i
 import json
 
 @app.route('/upload', methods=['GET', 'POST'])
+@require_google_login
 def upload_files():
     if request.method == 'POST':
         session.pop("email_path", None)
@@ -599,6 +600,7 @@ def send_message_via_gmail_api(creds, to_email, subject, body_text, attachment_p
     return service.users().messages().send(userId="me", body=body).execute()
 
 @app.route('/send_email', methods=['POST'])
+@require_google_login
 def send_email():
     # 1) Get Google OAuth credentials
     creds = get_google_creds()
@@ -698,6 +700,7 @@ def view_resume(filename):
 
 
 @app.route('/send_premade_cover', methods=['POST'])
+@require_google_login
 def send_premade_cover():
     from email.mime.image import MIMEImage
 
