@@ -308,7 +308,7 @@ def generate_cover_letter(company_name, job_position, job_description, website_i
 
 import json
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/upload', methods=['GET', 'POST'])
 def upload_files():
     if request.method == 'POST':
         session.clear()
@@ -347,7 +347,7 @@ def upload_files():
 
         return jsonify({"success": True, "message": "Files uploaded successfully!"})
 
-    return render_template('upload.html')
+    return render_template('premade_cover.html')
 
 def is_relevant_resume(job_description, resume_text):
     """
@@ -655,7 +655,7 @@ def success():
     return render_template('success.html')
 
 
-@app.route('/home')
+@app.route('/')
 def home():
     return render_template('home.html')
 
@@ -663,9 +663,7 @@ def home():
 def view_resume(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/premade_cover', methods=['GET', 'POST'])
-def premade_cover():
-    return render_template('premade_cover.html')
+
 
 @app.route('/send_premade_cover', methods=['POST'])
 def send_premade_cover():
