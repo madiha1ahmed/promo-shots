@@ -27,7 +27,30 @@
         
         
         <!--<a href="{{ url_for('upload_files') }}" class="btn btn-primary btn-lg me-3">Get Started 🚀</a> -->
-        <a href="{{ url_for('premade_cover') }}" class="btn btn-outline-secondary btn-lg">Get Started</a>
+        {% if google_connected %}
+  <p class="text-success fw-semibold mb-3">Google Connected ✅</p>
+
+  <a href="{{ url_for('upload_files') }}" class="btn btn-outline-secondary btn-lg me-2">
+    Get Started
+  </a>
+
+  <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-lg">
+    Logout
+  </a>
+{% else %}
+  <p class="text-danger fw-semibold mb-3">
+    You must connect Google to use this app (required to send promotions).
+  </p>
+
+  <a href="{{ url_for('google_auth') }}" class="btn btn-primary btn-lg me-2">
+    Connect with Google
+  </a>
+
+  <button class="btn btn-outline-secondary btn-lg" disabled>
+    Get Started
+  </button>
+{% endif %}
+
 
     </div>
 
