@@ -729,7 +729,7 @@ def send_premade_cover():
     try:
         df = pd.read_excel(email_file) if email_file.filename.endswith(".xlsx") else pd.read_csv(email_file)
 
-        if 'Email' not in df.columns or 'COLLEGE NAME' not in df.columns:
+        if 'Email' not in df.columns or 'NAME' not in df.columns:
             return jsonify({"success": False, "message": "Excel must contain 'Email' and 'COLLEGE NAME' columns."})
 
         server = smtplib.SMTP(smtp_server, smtp_port)
@@ -738,7 +738,7 @@ def send_premade_cover():
 
         for _, row in df.iterrows():
             recipient_email = row.get('Email')
-            college_name = row.get('COLLEGE NAME', 'Your College')
+            college_name = row.get('NAME', 'Your College')
 
             subject_line = f"Proposal for Strategic Partnership with {college_name}"
 
