@@ -37,7 +37,7 @@ from functools import wraps
 from flask import redirect, url_for
 
 
-
+os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-change-me")
@@ -113,15 +113,14 @@ def get_google_creds():
 
 @app.route("/auth/google")
 def google_auth():
-    """Start Google OAuth login."""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         return "Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.", 500
 
     flow = create_google_flow()
     authorization_url, state = flow.authorization_url(
-        access_type="offline",            # so we get refresh_token
-        include_granted_scopes="true",
-        prompt="consent",                 # ensures refresh_token first time
+        access_type="offline",
+        include_granted_scopes="false",  # IMPORTANT: do not auto-merge old scopes
+        prompt="consent",                # IMPORTANT: force re-consent so gmail scope is granted
     )
     session["oauth_state"] = state
     return redirect(authorization_url)
@@ -139,6 +138,10 @@ def google_oauth_callback():
 
     # You can temporarily log it if you want to confirm:
     # print("Auth response URL used for fetch_token:", auth_response)
+
+  
+    #os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
+
 
     flow.fetch_token(authorization_response=auth_response)
 
