@@ -819,7 +819,7 @@ def preview_cover_letter():
     try:
         llm_provider = request.form.get('llm_provider', 'openai')
         custom_prompt = request.form.get('custom_prompt', '').strip()
-        university_name = row.get('COLLEGE NAME', 'Your College')
+        university_name = row.get('NAME', 'Your College')
         subject = f"Proposal for Strategic Partnership with {university_name}"
 
 
