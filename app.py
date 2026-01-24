@@ -231,124 +231,6 @@ def fetch_website_info(website_url):
 
     return None
 
-# Generate AI-based cover letter
-def generate_cover_letter(company_name, job_position, job_description, website_info, resume_text):
-    """
-    Generates a professional and truthful cover letter based strictly on resume details.
-    """
-    llm_provider = session.get('llm_provider', 'openai')  # Default to OpenAI if not set
-    llm = initialize_llm(llm_provider)
-
-    # Ensure that website information is included properly if available
-    #website_section = (
-       # f"\nI reviewed the information available on {company_name}'s website and was particularly drawn to {website_info}. "
-        #if website_info and website_info.lower() != "no website available"
-        #else ""
-    #)
-
-    if website_info and website_info.strip():
-        website_section = f"I reviewed {company_name}'s website and was particularly drawn to {website_info}."
-    else:
-        website_section = ""  # Leave blank if no website info
-
-
-    # Get the current date
-    current_date = datetime.today().strftime('%B %d, %Y')
-
-    prompt = ChatPromptTemplate.from_template(f"""
-    You are a **highly precise and fact-based** job application assistant. 
-    Your task is to generate a **truthful, concise, and professional** cover letter based **ONLY on the provided resume**.
-
-    **Candidate Details:**
-    - **Name:** [Name from {resume_text}]
-    - **Address:** [Address from {resume_text}]
-    - **Phone Number:** [Phone Number from {resume_text}]
-    - **Date:** {current_date}
-
-    **Job Application Details:**
-    - **Company:** {company_name}
-    - **Position:** {job_position}
-    - **Job Description:** {job_description}
-
-    **Candidate's Resume:**
-    {resume_text}
-
-    {website_section}
-
-    **STRICT RULES:**
-    - **DO NOT fabricate any experiences, degrees, or skills that are NOT present in the resume.**
-    - **Only extract relevant skills and qualifications from the resume text above.**
-    - **If a required skill is missing, acknowledge it politely and express eagerness to learn.**
-    - **No generic statements like "passionate about teaching" unless proven from the resume.**
-    - **If website insights are available, integrate them naturally.**
-    - **Do not include LinkedIn Profile in the cover letter**
-    - **No more than TWO paragraphs.**
-
-    **Example Cover Letter Structure:**
-    
-    Dear Hiring Team of {company_name},
-
-    I am excited to apply for the {job_position} role at {company_name}. My background in **[relevant expertise from {resume_text}]** has enabled me to **[explain how your experience aligns with job responsibilities]**. {website_section}
-
-    I look forward to the opportunity to discuss how my expertise in **[relevant experience in {resume_text}]** can contribute to **[company's goal or project mentioned in job description]**.
-
-    Sincerely,  
-    [Name from {resume_text}] 
-    [City, Country from Address in {resume_text}]
-    Phone: [Phone number from {resume_text}]
-    
-    """)
-
-    # Create an LLM Chain using LangChain
-    #chain = prompt | llm
-    #response = chain.invoke({
-        #"company_name": company_name,
-        #"job_position": job_position,
-        #"job_description": job_description,
-        #"resume_text": resume_text,  # Explicitly passing the extracted resume
-        #"website_info_integration": website_section,
-    #})
-
-    #return response.content  # Extract the generated cover letter
-
-    if llm_provider == "deepseek":
-        chain = prompt | llm
-
-    # Pass input variables to the model
-        response = chain.invoke({
-        "company_name": company_name,
-        "job_position": job_position,
-        "job_description": job_description,
-        "resume_text": resume_text,  # Explicitly passing the extracted resume
-        "website_info_integration": website_section,
-        })
-
-        return response.content
-    
-    elif llm_provider == "gemini":
-        chain = prompt | llm
-
-    # Pass input variables to the model
-        response = chain.invoke({
-        "company_name": company_name,
-        "job_position": job_position,
-        "job_description": job_description,
-        "resume_text": resume_text,  # Explicitly passing the extracted resume
-        "website_info_integration": website_section,
-        })
-
-        return response.content
-    
-    else:
-        chain = prompt | llm
-        response = chain.invoke({
-        "company_name": company_name,
-        "job_position": job_position,
-        "job_description": job_description,
-        "resume_text": resume_text,  # Explicitly passing the extracted resume
-        "website_info_integration": website_section,
-    })
-        return response.content
 
 
 import json
@@ -398,166 +280,20 @@ def upload_files():
 
     return render_template('premade_cover.html')
 
-def is_relevant_resume(job_description, resume_text):
-    """
-    Determines if the resume is relevant to the job description by checking domain-specific skills.
-    If the job description contains IT-related skills, and the resume has overlapping skills, it is considered relevant.
-    """
-    llm = initialize_llm(session.get('llm_provider', 'openai'))
 
-    prompt = f"""
-    You are a strict hiring assistant.
 
-    Your job is to determine if a **resume is relevant** for a given **job description** based on industry skills.
     
-    **Instructions:**
-    - If the resume contains **relevant technical skills** (e.g., Python, SQL, Cloud Computing, AI, IT Security) for an IT-related job, it should be marked as "YES".
-    - If it is in a **completely different field** (e.g., receptionist for IT Manager), it should be marked as "NO".
-    - Consider **data engineers, software engineers, and AI researchers relevant for IT Management** roles if they have IT infrastructure knowledge.
 
-    **Examples:**
-    - Receptionist applying for IT Manager → "NO"
-    - Civil Engineer applying for Software Engineer → "NO"
-    - Data Scientist applying for AI Researcher → "YES"
-    - Data Engineer applying for IT Manager → "YES"
-    - Python Developer applying for IT Consultant → "YES"
-    - Doctor applying for Cybersecurity Analyst → "NO"
-
-    **Job Description:**
-    {job_description}
-
-    **Resume:**
-    {resume_text}  # Limiting token usage
-
-    Answer with only "YES" or "NO".
-    """
-
-    try:
-        result = llm.invoke(prompt).content.strip().upper()
-        return result == "YES"
-    except Exception as e:
-        print(f"❌ Filter error: {e}")
-        return False
-
-
-
-def select_best_resume(job_description, resume_texts):
-    """
-    Uses LLM to select the most relevant resume for the given job description.
-    No pre-filtering, purely prompt-based selection.
-    """
-    llm_provider = session.get('llm_provider', 'openai')
-    llm = initialize_llm(llm_provider)
-
-    # Ensure there are resumes to choose from
-    if not resume_texts:
-        print("❌ No resumes available for selection.")
-        return None
-
-    # Generate the selection prompt
-    combined_prompt = f"""
-    You are an expert recruiter.
-
-    Your task is to select the **best and most closely (even remotely closest)** resume for a given job description.
-    Below are multiple resumes. Choose the **most relevant one** based on education, experience, skills, volunteering, interest and industry match.
-
-    **Job Description:**
-    {job_description}
-
-    **Available Resumes:**
-    {json.dumps(resume_texts, indent=2)}
-
-    **Important Instructions:**
-    - Choose the resume that **best aligns with the job description**.
-    - If multiple resumes match, select the most experienced candidate.
-    - **Do NOT fabricate or assume skills that are not present in the resume.**
-    - **Output should be ONLY the filename of the best resume. No explanations, no extra text.**
-
-    **Example Output Format:**
-    Resume-2025.pdf
-    """
-
-    try:
-        best_filename = llm.invoke(combined_prompt).content.strip()
-        return best_filename if best_filename in resume_texts else None
-    except Exception as e:
-        print(f"❌ Resume selection error: {e}")
-        return None
-
+    
 
 @app.route("/premade_cover", methods=["GET"])
 def premade_cover():
     return render_template("premade_cover.html")
 
 
-@app.route('/generate_cover_letters')
-def generate_cover_letters():
-    email_path = session.get('email_path')
-    #resume_texts = session.get('resume_texts', {})  # ✅ Supports multiple resumes
-    resume_paths = session.get('resume_paths', {})
-    llm_provider = session.get('llm_provider', 'openai')  # Default to OpenAI
-
-    if not email_path or not resume_paths:
-        return redirect(url_for('upload_files'))
-
-    df = pd.read_excel(email_path) if email_path.endswith('.xlsx') else pd.read_csv(email_path)
-
-    # Load resume texts from file
-    # Load resume texts from file
-    try:
-        with open("resume_texts.json", "r") as f:
-            resume_texts = json.load(f)
-        print("✅ Loaded resume texts:", resume_texts.keys())  # Debugging print
-    except Exception as e:
-        print(f"❌ Error loading resume texts: {e}")
-        resume_texts = {}
 
 
-    #resume_text = extract_text_from_pdf(resume_path)
-
-    emails_data = []
-    total_jobs = len(df)
-
-    for index, row in df.iterrows():
-        company_name = row['Company Name']
-        job_position = row['Job Position']
-        job_description = row.get('Job Description', '').strip()
-        recipient_email = row['Email']
-        company_website = row.get('Website', '')
-
-        # ✅ Select the best resume for this job
-        best_resume_filename = select_best_resume(job_description, resume_texts)
-        print(f"🔍 Selected Resume for {job_position}: {best_resume_filename}")  # Debugging print
-
-        best_resume_text = resume_texts.get(best_resume_filename, "")
-
-        # Generate Cover Letter using selected resume
-        #cover_letter = generate_cover_letter(company_name, job_position, job_description, best_resume_text)
-
-
-        print(f"Extracted Job Description [{index}]: {job_description}")
-
-        website_info = fetch_website_info(company_website) if company_website else None
-
-        cover_letter = generate_cover_letter(company_name, job_position, job_description, website_info, best_resume_text)
-
-        emails_data.append({
-            'recipient_email': recipient_email,
-            'company_name': company_name,
-            'job_position': job_position,
-            'job_description': job_description,
-            'selected_resume': best_resume_filename,
-            'cover_letter': cover_letter
-        })
-
-        # Send progress updates to front-end
-        progress = int((index + 1) / total_jobs * 100)
-        socketio.emit('progress', {'progress': progress})
-        time.sleep(1)  # Simulate slight delay for progress bar animation
-
-    session['emails_data'] = emails_data
-    return jsonify({"success": True, "redirect_url": "/review"})
-
+    
 
 @app.route('/review', methods=['GET', 'POST'])
 def review_emails():
@@ -584,29 +320,27 @@ def send_message_via_gmail_api(creds, to_email, subject, body_text, attachment_p
 
     # Create the email
     msg = MIMEMultipart()
-    msg["From"] = "me"  # Gmail API automatically uses the authenticated user's email
-    msg["To"] = to_email
-    if bcc_email:
-        msg["Bcc"] = bcc_email
-    msg["Subject"] = subject
+    msg['From'] = sender_email
+    msg['To'] = email['recipient_email']
+    msg['Bcc'] = sender_email  # ✅ Adds sender in BCC
+    msg['Subject'] = f"Job Application for {email['job_position']}"
 
-    # Add the body of the email
-    msg.attach(MIMEText(body_text, "plain"))
+    msg.attach(MIMEText(email['cover_letter'], 'plain'))
 
-    # Attach file if available
-    if attachment_path:
-        with open(attachment_path, "rb") as attachment:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment.read())
-            encoders.encode_base64(part)
-            part.add_header(
-                "Content-Disposition", f"attachment; filename={os.path.basename(attachment_path)}"
-            )
-            msg.attach(part)
+            # ✅ Retrieve the correct resume path
+    resume_filename = email.get("selected_resume")  # The selected resume filename
+    resume_path = resume_paths.get(resume_filename)  # Get actual path from stored resumes
 
-    # Encode the message for sending via the Gmail API
-    raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
-    message = {"raw": raw_message}
+    if not resume_path:
+        print(f"❌ Resume path not found for {resume_filename}")
+        continue  # Skip this email if resume is missing
+
+    with open(resume_path, 'rb') as resume_file:
+        attach_file = MIMEBase('application', 'octet-stream')
+        attach_file.set_payload(resume_file.read())
+        encoders.encode_base64(attach_file)
+        attach_file.add_header('Content-Disposition', f'attachment; filename={os.path.basename(resume_path)}')
+        msg.attach(attach_file)
 
     try:
         send_message = service.users().messages().send(userId="me", body=message).execute()
