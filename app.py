@@ -317,7 +317,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 def send_message_via_gmail_api(creds, to_email, subject, body_text, attachment_path=None, bcc_email=None):
     """Send a single email with optional attachment using Gmail API."""
     service = build("gmail", "v1", credentials=creds)
-
+    sender_email = creds.id_token["email"]
     # Create the email
     msg = MIMEMultipart()
     msg['From'] = sender_email
@@ -343,7 +343,8 @@ def send_message_via_gmail_api(creds, to_email, subject, body_text, attachment_p
         msg.attach(attach_file)
 
     try:
-        send_message = service.users().messages().send(userId="me", body=message).execute()
+        service = build("gmail", "v1", credentials=creds)
+        send_message = service.users().messages().send(userId="me", body=msg).execute()
         print(f"Message Id: {send_message['id']}")
         return send_message
     except HttpError as error:
