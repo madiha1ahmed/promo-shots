@@ -320,15 +320,19 @@ def send_message_via_gmail_api(creds, to_email, subject, body_text, attachment_p
         print("❌ No valid credentials found.")
         return None  # Ensure creds is not None before accessing
 
-    # Log the entire creds object to inspect its structure
-    print("Google creds object:", creds)
-
-    # Get the sender's email from the credentials
-    sender_email = creds.id_token.get("email") if creds.id_token else None  # Safely get the email
+    # Fetch the sender's email from the Gmail API if not available in creds
+    try:
+        service = build("gmail", "v1", credentials=creds)
+        profile = service.users().getProfile(userId='me').execute()  # Get the user's profile
+        sender_email = profile['emailAddress']
+    except HttpError as error:
+        print(f"❌ Failed to fetch sender email: {error}")
+        return None  # Return if email is not fetched
 
     if not sender_email:
         print("❌ Sender email not found in credentials.")
         return None  # Return if email is not found in creds
+        
         
     msg = MIMEMultipart()
     msg['From'] = sender_email
@@ -372,6 +376,66 @@ def send_email():
             "success": False,
             "message": "Google account not connected. Please go back to Home and click 'Connect with Google' first."
         }), 401
+
+    emails_data = session.get('emails_data', [])
+    resume_paths = session.get('resume_paths', {})  # ✅ Now using stored resume paths
+
+    approved_indexes = request.form.getlist("approve_")  # Get checked indexes
+    print("✅ Approved indexes:", approved_indexes)
+
+    filtered_emails = [emails_data[int(i) - 1] for i in approved_indexes]
+    print(f"✅ {len(filtered_emails)} emails to be sent.")
+
+    if not filtered_emails:
+        print("❌ No emails selected for sending!")
+        return jsonify({"success": False, "message": "No emails were selected!"})
+
+    for i, email in enumerate(filtered_emails):
+        edited_cover_letter = request.form.get(f"cover_letter_{int(approved_indexes[i])}")
+        if edited_cover_letter:
+            email["cover_letter"] = edited_cover_letter.strip()
+
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        print("✅ Successfully logged into SMTP server.")
+
+        for email in filtered_emails:
+            msg = MIMEMultipart()
+            msg['From'] = sender_email
+            msg['To'] = email['recipient_email']
+            msg['Bcc'] = sender_email  # ✅ Adds sender in BCC
+            msg['Subject'] = f"Job Application for {email['job_position']}"
+
+            msg.attach(MIMEText(email['cover_letter'], 'plain'))
+
+            # ✅ Retrieve the correct resume path
+            resume_filename = email.get("selected_resume")  # The selected resume filename
+            resume_path = resume_paths.get(resume_filename)  # Get actual path from stored resumes
+
+            if not resume_path:
+                print(f"❌ Resume path not found for {resume_filename}")
+                continue  # Skip this email if resume is missing
+
+            with open(resume_path, 'rb') as resume_file:
+                attach_file = MIMEBase('application', 'octet-stream')
+                attach_file.set_payload(resume_file.read())
+                encoders.encode_base64(attach_file)
+                attach_file.add_header('Content-Disposition', f'attachment; filename={os.path.basename(resume_path)}')
+                msg.attach(attach_file)
+
+            server.send_message(msg)
+            print(f"✅ Email sent to {email['recipient_email']} for {email['job_position']}")
+
+        server.quit()
+        print("✅ SMTP server connection closed.")
+
+    except Exception as e:
+        print(f"❌ Failed to send emails. Error: {e}")
+        return jsonify({"success": False, "message": f"Error: {e}"})
+
+    return jsonify({"success": True, "redirect_url": "/success"})
 
     # Proceed with the rest of your logic to send emails using the Gmail API...
 
