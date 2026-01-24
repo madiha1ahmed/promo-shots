@@ -80,7 +80,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://promo-shots.mesaki.in/oauth2callback/google")
-GOOGLE_SCOPES = ["https://www.googleapis.com/auth/gmail.send", "openid", "https://www.googleapis.com/auth/userinfo.email"]
+GOOGLE_SCOPES = ["https://www.googleapis.com/auth/gmail.send", "openid", "https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/gmail.profile"]
 
 
 def create_google_flow():
@@ -138,6 +138,7 @@ def get_google_creds():
 
 
 
+
 @app.route("/auth/google")
 def google_auth():
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
@@ -146,11 +147,12 @@ def google_auth():
     flow = create_google_flow()
     authorization_url, state = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="false",  # IMPORTANT: do not auto-merge old scopes
-        prompt="consent",                # IMPORTANT: force re-consent so gmail scope is granted
+        include_granted_scopes="false",  # Force the user to re-consent
+        prompt="consent",  # Make sure the new scope is granted
     )
     session["oauth_state"] = state
     return redirect(authorization_url)
+
 
 
 @app.route("/oauth2callback/google")
