@@ -316,9 +316,17 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 
 def send_message_via_gmail_api(creds, to_email, subject, body_text, attachment_path=None, bcc_email=None):
     """Send a single email with optional attachment using Gmail API."""
-    service = build("gmail", "v1", credentials=creds)
-    sender_email = creds.id_token["email"]
-    # Create the email
+    if not creds:
+        print("❌ No valid credentials found.")
+        return None  # Ensure creds is not None before accessing
+
+    # Get the sender's email from the credentials
+    sender_email = creds.id_token.get("email") if creds.id_token else None  # Safely get the email
+
+    if not sender_email:
+        print("❌ Sender email not found in credentials.")
+        return None  # Return if email is not found in creds
+        
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = email['recipient_email']
