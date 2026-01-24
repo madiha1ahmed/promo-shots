@@ -320,6 +320,9 @@ def send_message_via_gmail_api(creds, to_email, subject, body_text, attachment_p
         print("❌ No valid credentials found.")
         return None  # Ensure creds is not None before accessing
 
+    # Log the entire creds object to inspect its structure
+    print("Google creds object:", creds)
+
     # Get the sender's email from the credentials
     sender_email = creds.id_token.get("email") if creds.id_token else None  # Safely get the email
 
