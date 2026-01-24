@@ -333,7 +333,7 @@ def send_message_via_gmail_api(creds, to_email, subject, body_text, attachment_p
 
     if not resume_path:
         print(f"❌ Resume path not found for {resume_filename}")
-        continue  # Skip this email if resume is missing
+        return None  # Skip this email if resume is missing
 
     with open(resume_path, 'rb') as resume_file:
         attach_file = MIMEBase('application', 'octet-stream')
