@@ -37,6 +37,14 @@ from functools import wraps
 from flask import redirect, url_for
 import smtplib
 import traceback
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from email.mime.base import MIMEBase
+from email import encoders
+import base64
 
 
 
@@ -574,8 +582,9 @@ def send_message_via_gmail_api(creds, to_email, subject, body_text, attachment_p
     """Send a single email with optional attachment using Gmail API."""
     service = build("gmail", "v1", credentials=creds)
 
+    # Create the email
     msg = MIMEMultipart()
-    msg["From"] = "me"  # Gmail will automatically use the authenticated user's email
+    msg["From"] = "me"  # Gmail API automatically uses the authenticated user's email
     msg["To"] = to_email
     if bcc_email:
         msg["Bcc"] = bcc_email
@@ -595,11 +604,17 @@ def send_message_via_gmail_api(creds, to_email, subject, body_text, attachment_p
             )
             msg.attach(part)
 
-    # Send the email
+    # Encode the message for sending via the Gmail API
     raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
     message = {"raw": raw_message}
 
-    return service.users().messages().send(userId="me", body=message).execute()
+    try:
+        send_message = service.users().messages().send(userId="me", body=message).execute()
+        print(f"Message Id: {send_message['id']}")
+        return send_message
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return None
 
 
 @app.route('/send_email', methods=['POST'])
@@ -639,12 +654,10 @@ def view_resume(filename):
 @app.route('/send_premade_cover', methods=['POST'])
 @require_google_login
 def send_premade_cover():
-    from email.mime.image import MIMEImage
-
     sender_email = "meerahmed@gmail.com"
-    sender_password = "dqqo uhqy tjbz zuok"
-    smtp_server = "smtp.gmail.com"
-    smtp_port = 587
+    sender_password = "dqqo uhqy tjbz zuok"  # This is no longer needed since we're using Gmail API
+    smtp_server = "smtp.gmail.com"  # No longer needed
+    smtp_port = 587  # No longer needed
 
     email_file = request.files.get('email_file')
     flyer_file = request.files.get('flyer_image')
@@ -663,9 +676,10 @@ def send_premade_cover():
         if 'Email' not in df.columns or 'NAME' not in df.columns:
             return jsonify({"success": False, "message": "Excel must contain 'Email' and 'COLLEGE NAME' columns."})
 
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(sender_email, sender_password)
+        # Get Google credentials from the session
+        creds = get_google_creds()
+        if not creds:
+            return jsonify({"success": False, "message": "Google account not connected. Please go back to Home and click 'Connect with Google' first."}), 401
 
         for _, row in df.iterrows():
             recipient_email = row.get('Email')
@@ -729,11 +743,15 @@ def send_premade_cover():
                         part.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(filepath)}"')
                         msg.attach(part)
 
-            server.send_message(msg)
-            print(f"✅ Sent to {recipient_email}")
+            # Send email using Gmail API
+            send_message_via_gmail_api(creds, recipient_email, subject_line, html_body, flyer_path)
 
-        server.quit()
-        return redirect(url_for("success"))
+        return jsonify({"success": True, "message": "Emails sent successfully!"})
+
+    except Exception as e:
+        print("❌ Error sending emails:", str(e))
+        return jsonify({"success": False, "message": f"Error: {str(e)}"})
+
 
 
     except Exception as e:
